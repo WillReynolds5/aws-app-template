@@ -29,6 +29,14 @@
     --chart-3: 197 37% 24%;
     --chart-4: 43 74% 66%;
     --chart-5: 27 87% 67%;
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 240 5.3% 26.1%;
+    --sidebar-primary: 240 5.9% 10%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 240 4.8% 95.9%;
+    --sidebar-accent-foreground: 240 5.9% 10%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
   }
 
   .dark {
@@ -56,6 +64,14 @@
     --chart-3: 30 80% 55%;
     --chart-4: 280 65% 60%;
     --chart-5: 340 75% 55%;
+    --sidebar-background: 240 5.9% 10%;
+    --sidebar-foreground: 240 4.8% 95.9%;
+    --sidebar-primary: 224.3 76.3% 48%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 3.7% 15.9%;
+    --sidebar-accent-foreground: 240 4.8% 95.9%;
+    --sidebar-border: 240 3.7% 15.9%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
   }
 }
 
@@ -66,4 +82,40 @@
   body {
     @apply bg-background text-foreground;
   }
+}
+
+.animate-text-gradient {
+  animation: text-gradient 8s linear infinite;
+}
+
+.bg-300\% {
+  background-size: 300%;
+}
+
+@keyframes text-gradient {
+  from {
+    background-position: 0% center;
+  }
+  to {
+    background-position: -300% center;
+  }
+}
+
+@keyframes glow {
+  0% {
+    box-shadow: 0 0 5px rgba(167, 139, 250, 0.3),
+      0 0 10px rgba(236, 72, 153, 0.3), 0 0 15px rgba(96, 165, 250, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 10px rgba(167, 139, 250, 0.5),
+      0 0 20px rgba(236, 72, 153, 0.5), 0 0 30px rgba(96, 165, 250, 0.5);
+  }
+  100% {
+    box-shadow: 0 0 5px rgba(167, 139, 250, 0.3),
+      0 0 10px rgba(236, 72, 153, 0.3), 0 0 15px rgba(96, 165, 250, 0.3);
+  }
+}
+
+.animate-glow {
+  animation: glow 3s ease-in-out infinite;
 }

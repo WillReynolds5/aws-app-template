@@ -1,0 +1,122 @@
+Here's a comprehensive guide on prompt engineering:
+
+# Prompt Engineering Best Practices
+
+## Core Principles
+
+### 1. Be Clear and Direct
+- Think of Claude as a brilliant but new employee who needs explicit instructions
+- Provide contextual information about:
+  - What the task results will be used for
+  - Target audience
+  - Workflow context
+  - Success criteria
+- Use numbered lists or bullet points for sequential steps
+- Test your prompt: If a colleague would be confused by the instructions, Claude likely will be too
+
+### 2. Use Examples (Multishot Prompting)
+- Include 3-5 diverse, relevant examples to show exactly what you want
+- Ensure examples are:
+  - Relevant to your use case
+  - Diverse enough to cover edge cases
+  - Clear and well-structured
+- Wrap examples in XML tags for clarity:
+```xml
+<example>
+Your example here
+</example>
+```
+
+### 3. Chain of Thought (CoT) Prompting
+For complex tasks, let Claude think step-by-step:
+
+#### Methods (from simple to complex):
+1. Basic: Add "Think step-by-step" to your prompt
+2. Guided: Outline specific steps for Claude to follow
+3. Structured: Use XML tags to separate reasoning from answers:
+```xml
+<thinking>
+Step-by-step reasoning
+</thinking>
+<answer>
+Final response
+</answer>
+```
+
+Best for:
+- Complex math
+- Multi-step analysis
+- Writing complex documents
+- Multi-factor decisions
+
+### 4. System Prompts and Role Assignment
+- Use the `system` parameter to give Claude a specific role
+- Keep task-specific instructions in the `user` message
+- Benefits:
+  - Enhanced accuracy in domain-specific tasks
+  - Tailored communication style
+  - Better task focus
+
+Example:
+```python
+client.messages.create(
+    system="You are a seasoned data scientist at a Fortune 500 company.",
+    messages=[{"role": "user", "content": "Analyze this dataset..."}]
+)
+```
+
+### 5. Long Context Best Practices
+For handling large documents (200K tokens for Claude 3):
+
+1. Document Structure:
+```xml
+<documents>
+  <document index="1">
+    <source>filename.pdf</source>
+    <document_content>
+      {{CONTENT}}
+    </document_content>
+  </document>
+</documents>
+```
+
+2. Key Tips:
+- Place long documents at the top of your prompt
+- Put queries at the end (can improve response quality by 30%)
+- Use XML tags to structure content and metadata
+- Ask Claude to quote relevant parts before analysis
+
+## Implementation Example
+
+Here's how these concepts might come together:
+
+```python
+response = client.messages.create(
+    system="You are an expert financial analyst with 20 years of experience.",
+    messages=[{
+        "role": "user", 
+        "content": """
+        <documents>
+            {{FINANCIAL_REPORTS}}
+        </documents>
+
+        <example>
+        Input: Q2 Revenue Analysis
+        Output: Detailed breakdown with YoY comparisons...
+        </example>
+
+        Analyze these financial reports. Think step-by-step:
+        1. Extract key metrics
+        2. Compare to industry benchmarks
+        3. Identify trends and anomalies
+        4. Provide recommendations
+
+        Please structure your response with:
+        <thinking>Your analysis steps</thinking>
+        <answer>Your final report</answer>
+        """
+    }]
+)
+```
+
+This guide combines the most important concepts from Anthropic's documentation. Remember to adapt these practices based on your specific use case and requirements.

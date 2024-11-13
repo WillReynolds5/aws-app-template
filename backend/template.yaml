@@ -1,15 +1,11 @@
 AWSTemplateFormatVersion: "2010-09-09"
 Transform: AWS::Serverless-2016-10-31
-Description: Meeca Backend Serverless Application
+Description: AutoPrompt Backend Serverless Application
 
 Parameters:
-  BucketName:
-    Type: String
-    Default: meeca2-dev
-    Description: Name of the S3 bucket for storing avatars
   DynamoDBTableName:
     Type: String
-    Default: MeecaApp
+    Default: AutoPromptApp
     Description: Name of the existing DynamoDB table
 
 Globals:
@@ -23,11 +19,11 @@ Globals:
         ALLOWED_HOSTS: "*"
         ALLOWED_ORIGIN: "http://localhost:3000"
         TABLE_NAME: !Ref DynamoDBTableName
-        BUCKET_NAME: !Ref BucketName
         AWS_SAM_LOCAL: "true"
         AWS_REGION: "us-west-1"
         COGNITO_USER_POOL_ID: "us-west-1_OhDnHEXLi"
         COGNITO_USER_POOL_CLIENT_ID: "6cgbaguv56185c18o0q7khb9c8"
+        SAFETY_MODE: "true"
     LoggingConfig:
       LogFormat: JSON
   Api:
@@ -36,11 +32,6 @@ Globals:
       AllowMethods: "'GET,POST,PUT,DELETE,OPTIONS'"
       AllowHeaders: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
       AllowOrigin: "'http://localhost:3000'"
-    BinaryMediaTypes:
-      - multipart/form-data
-      - image/jpeg
-      - image/png
-      - image/gif
 
 Resources:
   LambdaExecutionRole:
@@ -55,8 +46,30 @@ Resources:
             Action: sts:AssumeRole
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: DynamoDBAccess
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:GetItem
+                  - dynamodb:PutItem
+                  - dynamodb:UpdateItem
+                  - dynamodb:DeleteItem
+                  - dynamodb:Query
+                  - dynamodb:Scan
+                Resource: !GetAtt AutoPromptAppTable.Arn
+        - PolicyName: InvokeLambda
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - lambda:InvokeFunction
+                Resource: "*"
 
-  MeecaApi:
+  AutoPromptApi:
     Type: AWS::Serverless::Api
     Properties:
       StageName: Local
@@ -64,6 +77,15 @@ Resources:
         AllowMethods: "'GET,POST,PUT,DELETE,OPTIONS'"
         AllowHeaders: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
         AllowOrigin: "'http://localhost:3000'"
+      GatewayResponses:
+        DEFAULT_4XX:
+          ResponseParameters:
+            Headers:
+              Access-Control-Allow-Origin: "'*'"
+        DEFAULT_5XX:
+          ResponseParameters:
+            Headers:
+              Access-Control-Allow-Origin: "'*'"
       Auth:
         DefaultAuthorizer: BaseUserRequestAuth
         Authorizers:
@@ -74,6 +96,57 @@ Resources:
             FunctionPayloadType: REQUEST
             FunctionArn: !GetAtt AdminUserRequestFunction.Arn
         AddDefaultAuthorizerToCorsPreflight: False
+
+  AutoPromptAppTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: AutoPromptApp
+      AttributeDefinitions:
+        - AttributeName: PK
+          AttributeType: S
+        - AttributeName: SK
+          AttributeType: S
+        - AttributeName: GSI1PK
+          AttributeType: S
+        - AttributeName: GSI1SK
+          AttributeType: S
+        - AttributeName: GSI2PK
+          AttributeType: S
+        - AttributeName: GSI2SK
+          AttributeType: S
+        - AttributeName: OwnerId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: PK
+          KeyType: HASH
+        - AttributeName: SK
+          KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: GSI1PK-GSI1SK-index"
+          KeySchema:
+            - AttributeName: GSI1PK
+              KeyType: HASH
+            - AttributeName: GSI1SK
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+        - IndexName: GSI2PK-GSI2SK-index
+          KeySchema:
+            - AttributeName: GSI2PK
+              KeyType: HASH
+            - AttributeName: GSI2SK
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+        - IndexName: OwnerId-index
+          KeySchema:
+            - AttributeName: OwnerId
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+      ProvisionedThroughput:
+        ReadCapacityUnits: 5
+        WriteCapacityUnits: 5
 
   # Authorizer functions
   BaseUserRequestFunction:
@@ -94,20 +167,54 @@ Resources:
       Policies:
         - AWSLambdaBasicExecutionRole
 
-  # Example function with auth
-  AvatarsFunction:
+  # User profile functions
+  UserProfileFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: functions/avatars/
-      Handler: handler.avatar_handler
+      CodeUri: functions/userprofile/
+      Handler: handler.user_profile_handler
       Runtime: python3.9
       Role: !GetAtt LambdaExecutionRole.Arn
       Events:
-        AvatarsPost:
+        UserProfileGet:
           Type: Api
           Properties:
-            RestApiId: !Ref MeecaApi
-            Path: /avatars/create
+            RestApiId: !Ref AutoPromptApi
+            Path: /user-profile
+            Method: GET
+        UserProfilePost:
+          Type: Api
+          Properties:
+            RestApiId: !Ref AutoPromptApi
+            Path: /user-profile
             Method: POST
-            Auth:
-              Authorizer: AdminUserRequestAuth
+
+  ApplicationResourceGroup:
+    Type: AWS::ResourceGroups::Group
+    Properties:
+      Name:
+        Fn::Sub: ApplicationInsights-SAM-${AWS::StackName}
+      ResourceQuery:
+        Type: CLOUDFORMATION_STACK_1_0
+
+  ApplicationInsightsMonitoring:
+    Type: AWS::ApplicationInsights::Application
+    Properties:
+      ResourceGroupName:
+        Ref: ApplicationResourceGroup
+      AutoConfigurationEnabled: "true"
+
+  PromptFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/prompt/
+      Handler: handler.prompt_handler
+      Runtime: python3.9
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Events:
+        PromptPost:
+          Type: Api
+          Properties:
+            RestApiId: !Ref AutoPromptApi
+            Path: /prompt
+            Method: POST
