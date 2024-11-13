@@ -1,0 +1,8 @@
+# requirements.txt for virtual env
+arrow
+boto3
+requests
+multipart
+Pillow
+PyJWT
+cryptography
