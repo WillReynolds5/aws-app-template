@@ -55,38 +55,6 @@ Resources:
             Action: sts:AssumeRole
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
-      Policies:
-        - PolicyName: DynamoDBAccess
-          PolicyDocument:
-            Version: "2012-10-17"
-            Statement:
-              - Effect: Allow
-                Action:
-                  - dynamodb:GetItem
-                  - dynamodb:PutItem
-                  - dynamodb:UpdateItem
-                  - dynamodb:DeleteItem
-                  - dynamodb:Query
-                  - dynamodb:Scan
-                Resource: !GetAtt MeecaAppTable.Arn
-        - PolicyName: S3Access
-          PolicyDocument:
-            Version: "2012-10-17"
-            Statement:
-              - Effect: Allow
-                Action:
-                  - s3:GetObject
-                  - s3:PutObject
-                  - s3:DeleteObject
-                Resource: !Sub arn:aws:s3:::${BucketName}/*
-        - PolicyName: InvokeLambda
-          PolicyDocument:
-            Version: "2012-10-17"
-            Statement:
-              - Effect: Allow
-                Action:
-                  - lambda:InvokeFunction
-                Resource: "*"
 
   MeecaApi:
     Type: AWS::Serverless::Api
@@ -96,15 +64,6 @@ Resources:
         AllowMethods: "'GET,POST,PUT,DELETE,OPTIONS'"
         AllowHeaders: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
         AllowOrigin: "'http://localhost:3000'"
-      GatewayResponses:
-        DEFAULT_4XX:
-          ResponseParameters:
-            Headers:
-              Access-Control-Allow-Origin: "'*'"
-        DEFAULT_5XX:
-          ResponseParameters:
-            Headers:
-              Access-Control-Allow-Origin: "'*'"
       Auth:
         DefaultAuthorizer: BaseUserRequestAuth
         Authorizers:
@@ -115,58 +74,6 @@ Resources:
             FunctionPayloadType: REQUEST
             FunctionArn: !GetAtt AdminUserRequestFunction.Arn
         AddDefaultAuthorizerToCorsPreflight: False
-
-  # Not used in production/staging templates
-  MeecaAppTable:
-    Type: AWS::DynamoDB::Table
-    Properties:
-      TableName: MeecaApp
-      AttributeDefinitions:
-        - AttributeName: PK
-          AttributeType: S
-        - AttributeName: SK
-          AttributeType: S
-        - AttributeName: GSI1PK
-          AttributeType: S
-        - AttributeName: GSI1SK
-          AttributeType: S
-        - AttributeName: GSI2PK
-          AttributeType: S
-        - AttributeName: GSI2SK
-          AttributeType: S
-        - AttributeName: OwnerId
-          AttributeType: S
-      KeySchema:
-        - AttributeName: PK
-          KeyType: HASH
-        - AttributeName: SK
-          KeyType: RANGE
-      GlobalSecondaryIndexes:
-        - IndexName: GSI1PK-GSI1SK-index"
-          KeySchema:
-            - AttributeName: GSI1PK
-              KeyType: HASH
-            - AttributeName: GSI1SK
-              KeyType: RANGE
-          Projection:
-            ProjectionType: ALL
-        - IndexName: GSI2PK-GSI2SK-index
-          KeySchema:
-            - AttributeName: GSI2PK
-              KeyType: HASH
-            - AttributeName: GSI2SK
-              KeyType: RANGE
-          Projection:
-            ProjectionType: ALL
-        - IndexName: OwnerId-index
-          KeySchema:
-            - AttributeName: OwnerId
-              KeyType: HASH
-          Projection:
-            ProjectionType: ALL
-      ProvisionedThroughput:
-        ReadCapacityUnits: 5
-        WriteCapacityUnits: 5
 
   # Authorizer functions
   BaseUserRequestFunction:
@@ -187,7 +94,7 @@ Resources:
       Policies:
         - AWSLambdaBasicExecutionRole
 
-  # Avatars functions
+  # Example function with auth
   AvatarsFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -204,119 +111,3 @@ Resources:
             Method: POST
             Auth:
               Authorizer: AdminUserRequestAuth
-        AvatarsGet:
-          Type: Api
-          Properties:
-            RestApiId: !Ref MeecaApi
-            Path: /avatars
-            Method: GET
-            Auth:
-              Authorizer: BaseUserRequestAuth
-        AvatarsGetAll:
-          Type: Api
-          Properties:
-            RestApiId: !Ref MeecaApi
-            Path: /avatars/all
-            Method: GET
-            Auth:
-              Authorizer: AdminUserRequestAuth
-        AvatarsVoicesGet:
-          Type: Api
-          Properties:
-            RestApiId: !Ref MeecaApi
-            Path: /avatars/voices
-            Method: GET
-            Auth:
-              Authorizer: AdminUserRequestAuth
-        AvatarsVoicesPost:
-          Type: Api
-          Properties:
-            RestApiId: !Ref MeecaApi
-            Path: /avatars/voices/create
-            Method: POST
-            Auth:
-              Authorizer: AdminUserRequestAuth
-
-  # User profile functions
-  UserProfileFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      CodeUri: functions/userprofile/
-      Handler: handler.user_profile_handler
-      Runtime: python3.9
-      Role: !GetAtt LambdaExecutionRole.Arn
-      Events:
-        UserProfileGet:
-          Type: Api
-          Properties:
-            RestApiId: !Ref MeecaApi
-            Path: /user-profile
-            Method: GET
-        UserProfilePost:
-          Type: Api
-          Properties:
-            RestApiId: !Ref MeecaApi
-            Path: /user-profile
-            Method: POST
-
-  # Rooms functions
-  RoomsFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      CodeUri: functions/rooms/
-      Handler: handler.room_handler
-      Runtime: python3.9
-      Role: !GetAtt LambdaExecutionRole.Arn
-      Events:
-        RoomMessagesGet:
-          Type: Api
-          Properties:
-            RestApiId: !Ref MeecaApi
-            # TODO, should use path <id> param rather than ?id=
-            Path: /rooms/{room_id}
-            Method: GET
-        RoomsPost:
-          Type: Api
-          Properties:
-            RestApiId: !Ref MeecaApi
-            Path: /rooms
-            Method: POST
-        RoomMessagesPost:
-          Type: Api
-          Properties:
-            RestApiId: !Ref MeecaApi
-            Path: /rooms/{room_id}/messages
-            Method: POST
-        RoomMessagesGenerateAudio:
-          Type: Api
-          Properties:
-            RestApiId: !Ref MeecaApi
-            Path: /rooms/messages/{message_id}/audio
-            Method: POST
-
-  # S3 bucket settings
-  MeecaS3Bucket:
-    Type: AWS::S3::Bucket
-    Properties:
-      BucketName: !Ref BucketName
-      AccessControl: Private
-      PublicAccessBlockConfiguration:
-        BlockPublicAcls: true
-        BlockPublicPolicy: true
-        IgnorePublicAcls: true
-        RestrictPublicBuckets: true
-
-  ApplicationResourceGroup:
-    Type: AWS::ResourceGroups::Group
-    Properties:
-      Name:
-        Fn::Sub: ApplicationInsights-SAM-${AWS::StackName}
-      ResourceQuery:
-        Type: CLOUDFORMATION_STACK_1_0
-
-  ApplicationInsightsMonitoring:
-    Type: AWS::ApplicationInsights::Application
-    Properties:
-      ResourceGroupName:
-        Ref: ApplicationResourceGroup
-      AutoConfigurationEnabled: "true"
