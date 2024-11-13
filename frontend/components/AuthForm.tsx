@@ -31,7 +31,7 @@ export function UserAuthForm() {
         });
 
         if (nextStep.signInStep === "DONE") {
-          router.push("/conversations");
+          router.push("/home");
         }
       } else {
         const { isSignUpComplete } = await signUp({
